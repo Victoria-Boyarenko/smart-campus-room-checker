@@ -49,6 +49,16 @@ describe("validateInput", () => {
       validateInput(baseInput({ isAvailable: false, reasonCode: "bogus" as never }))
     ).not.toBeNull();
   });
+
+  it("rejects an overly long roomLabel (over 120 chars)", () => {
+    expect(
+      validateInput(baseInput({ roomLabel: "X".repeat(121) }))
+    ).not.toBeNull();
+  });
+
+  it("accepts a roomLabel of exactly 120 chars", () => {
+    expect(validateInput(baseInput({ roomLabel: "X".repeat(120) }))).toBeNull();
+  });
 });
 
 describe("validateOutput", () => {
@@ -150,6 +160,40 @@ describe("explainAvailability", () => {
     const res = await explainAvailability({});
     expect(res.ok).toBe(false);
     expect(res.fellBack).toBe(true);
+  });
+
+  it("falls back on overly long input (roomLabel over 120 chars)", async () => {
+    const res = await explainAvailability(
+      baseInput({ roomLabel: "X".repeat(200) })
+    );
+    expect(res.ok).toBe(false);
+    expect(res.fellBack).toBe(true);
+    expect(res.output.explanation.length).toBeGreaterThan(0);
+    expect(res.output.explanation.length).toBeLessThanOrEqual(200);
+  });
+
+  it("never changes the deterministic availability decision during failures", async () => {
+    // The adapter output only carries explanation text; isAvailable is never
+    // present in ExplainOutput, so the decision cannot be overridden.
+    const scenarios: Array<{ input: Partial<ExplainInput>; simulate?: "timeout" | "api_error" }> = [
+      { input: { isAvailable: false, reasonCode: "overlap" } },
+      { input: { isAvailable: false, reasonCode: "room_blocked" } },
+      { input: { isAvailable: false, reasonCode: "invalid_time" } },
+      { input: { isAvailable: false, reasonCode: "start_after_now" } },
+      { input: { isAvailable: false, reasonCode: "exceeds_max_duration" } },
+      { input: {}, simulate: "timeout" },
+      { input: {}, simulate: "api_error" },
+    ];
+    for (const { input, simulate } of scenarios) {
+      const res = await explainAvailability(
+        baseInput({ isAvailable: input.isAvailable ?? true, reasonCode: input.reasonCode ?? "available", ...input }),
+        simulate ? { simulate } : undefined
+      );
+      // ExplainOutput contains only { explanation: string } — no isAvailable field.
+      expect("isAvailable" in res.output).toBe(false);
+      expect(typeof res.output.explanation).toBe("string");
+      expect(res.output.explanation.length).toBeGreaterThan(0);
+    }
   });
 
   it("never exceeds two sentences or 200 characters", async () => {

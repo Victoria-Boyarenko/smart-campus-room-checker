@@ -35,7 +35,7 @@ const FALLBACKS: Record<ReasonCode, (input: ExplainInput) => string> = {
 };
 
 function fallbackFor(input: ExplainInput): ExplainOutput {
-  return { explanation: FALLBACKS[input.reasonCode](input) };
+  return { explanation: clampExplanation(FALLBACKS[input.reasonCode](input)) };
 }
 
 export function fallbackExplanation(input: ExplainInput): ExplainOutput {
