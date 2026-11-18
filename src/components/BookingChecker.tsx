@@ -11,6 +11,8 @@ import { durationLabel, minutesToLabel } from "@/lib/time";
 import TimeSelect from "@/components/TimeSelect";
 import Timeline from "@/components/Timeline";
 import ResultBanner from "@/components/ResultBanner";
+import ExplainPanel from "@/components/ExplainPanel";
+import { reasonCodeFromMessage, type ExplainInput, type ReasonCode } from "@/lib/explain";
 
 interface BookingCheckerProps {
   room: RoomConfig | null;
@@ -131,6 +133,18 @@ export default function BookingChecker({ room, now }: BookingCheckerProps) {
         {result && (
           <div className="mt-4">
             <ResultBanner result={result} />
+            {s !== undefined && e !== undefined && result.kind !== "error" && (
+              <ExplainPanel
+                input={{
+                  roomLabel: room.name,
+                  start: s,
+                  end: e,
+                  isAvailable: result.isAvailable,
+                  reasonCode: reasonCodeFromMessage(result.message, result.isAvailable) as ReasonCode,
+                  knownBookingLabels: room.bookings.map((b) => b.label),
+                } satisfies ExplainInput}
+              />
+            )}
           </div>
         )}
       </div>

@@ -1,0 +1,179 @@
+import { describe, it, expect } from "vitest";
+import {
+  explainAvailability,
+  validateInput,
+  validateOutput,
+  fallbackExplanation,
+} from "./mockLLM";
+import type { ExplainInput } from "./explain";
+
+const baseInput = (overrides: Partial<ExplainInput> = {}): ExplainInput => ({
+  roomLabel: "Engineering Hall, Room 204",
+  start: 660,
+  end: 720,
+  isAvailable: true,
+  reasonCode: "available",
+  knownBookingLabels: ["Data Structures Lecture"],
+  ...overrides,
+});
+
+describe("validateInput", () => {
+  it("accepts a well-formed input", () => {
+    expect(validateInput(baseInput())).toBeNull();
+  });
+
+  it("rejects null", () => {
+    expect(validateInput(null)).not.toBeNull();
+  });
+
+  it("rejects an empty roomLabel", () => {
+    expect(validateInput(baseInput({ roomLabel: "  " }))).not.toBeNull();
+  });
+
+  it("rejects non-integer start", () => {
+    expect(validateInput(baseInput({ start: 600.5 }))).not.toBeNull();
+  });
+
+  it("rejects end <= start", () => {
+    expect(validateInput(baseInput({ start: 700, end: 700, isAvailable: true }))).not.toBeNull();
+  });
+
+  it("rejects isAvailable / reasonCode mismatch", () => {
+    expect(
+      validateInput(baseInput({ isAvailable: false, reasonCode: "available" }))
+    ).not.toBeNull();
+  });
+
+  it("rejects an unknown reasonCode", () => {
+    expect(
+      validateInput(baseInput({ isAvailable: false, reasonCode: "bogus" as never }))
+    ).not.toBeNull();
+  });
+});
+
+describe("validateOutput", () => {
+  it("accepts a short two-sentence explanation", () => {
+    expect(validateOutput({ explanation: "Room is free. Book it now." }, [])).toBeNull();
+  });
+
+  it("rejects empty explanations", () => {
+    expect(validateOutput({ explanation: "   " }, [])).not.toBeNull();
+  });
+
+  it("rejects explanations over 200 chars", () => {
+    expect(validateOutput({ explanation: "A".repeat(201) + "." }, [])).not.toBeNull();
+  });
+
+  it("rejects more than two sentences", () => {
+    expect(validateOutput({ explanation: "One. Two. Three." }, [])).not.toBeNull();
+  });
+
+  it("rejects invented booking nouns", () => {
+    expect(validateOutput({ explanation: "A lecture blocks the room." }, [])).not.toBeNull();
+  });
+});
+
+describe("explainAvailability", () => {
+  it("returns a valid explanation for an available slot", async () => {
+    const res = await explainAvailability(baseInput());
+    expect(res.ok).toBe(true);
+    expect(res.output.explanation.length).toBeGreaterThan(0);
+    expect(res.output.explanation.length).toBeLessThanOrEqual(200);
+  });
+
+  it("explains an overlap without inventing bookings", async () => {
+    const res = await explainAvailability(
+      baseInput({
+        start: 630,
+        end: 690,
+        isAvailable: false,
+        reasonCode: "overlap",
+      })
+    );
+    expect(res.ok).toBe(true);
+    expect(res.output.explanation).not.toContain("Data Structures Lecture");
+  });
+
+  it("explains a blocked room", async () => {
+    const res = await explainAvailability(
+      baseInput({ isAvailable: false, reasonCode: "room_blocked" })
+    );
+    expect(res.ok).toBe(true);
+    expect(res.output.explanation).toContain("blocked");
+  });
+
+  it("explains an invalid time", async () => {
+    const res = await explainAvailability(
+      baseInput({ isAvailable: false, reasonCode: "invalid_time" })
+    );
+    expect(res.ok).toBe(true);
+    expect(res.output.explanation.length).toBeGreaterThan(0);
+  });
+
+  it("explains a past-time start", async () => {
+    const res = await explainAvailability(
+      baseInput({ isAvailable: false, reasonCode: "start_after_now" })
+    );
+    expect(res.ok).toBe(true);
+  });
+
+  it("explains an excessive duration", async () => {
+    const res = await explainAvailability(
+      baseInput({ isAvailable: false, reasonCode: "exceeds_max_duration" })
+    );
+    expect(res.ok).toBe(true);
+    expect(res.output.explanation).toContain("120");
+  });
+
+  it("falls back deterministically on simulated timeout", async () => {
+    const res = await explainAvailability(baseInput(), { simulate: "timeout" });
+    expect(res.ok).toBe(false);
+    expect(res.fellBack).toBe(true);
+    expect(res.output.explanation.length).toBeGreaterThan(0);
+  });
+
+  it("falls back deterministically on simulated API error", async () => {
+    const res = await explainAvailability(baseInput(), { simulate: "api_error" });
+    expect(res.ok).toBe(false);
+    expect(res.fellBack).toBe(true);
+    expect(res.output.explanation.length).toBeGreaterThan(0);
+  });
+
+  it("falls back on malformed input without throwing", async () => {
+    const res = await explainAvailability(null);
+    expect(res.ok).toBe(false);
+    expect(res.fellBack).toBe(true);
+    expect(res.output.explanation.length).toBeGreaterThan(0);
+  });
+
+  it("falls back on empty input", async () => {
+    const res = await explainAvailability({});
+    expect(res.ok).toBe(false);
+    expect(res.fellBack).toBe(true);
+  });
+
+  it("never exceeds two sentences or 200 characters", async () => {
+    const codes = [
+      "available",
+      "invalid_time",
+      "start_after_now",
+      "exceeds_max_duration",
+      "room_blocked",
+      "overlap",
+    ] as const;
+    for (const reasonCode of codes) {
+      const res = await explainAvailability(
+        baseInput({ isAvailable: reasonCode === "available", reasonCode })
+      );
+      const sentences = res.output.explanation.split(/(?<=[.!?])\s+/).filter(Boolean);
+      expect(sentences.length).toBeLessThanOrEqual(2);
+      expect(res.output.explanation.length).toBeLessThanOrEqual(200);
+    }
+  });
+});
+
+describe("fallbackExplanation", () => {
+  it("returns a non-empty explanation for available", () => {
+    expect(fallbackExplanation(baseInput()).explanation.length).toBeGreaterThan(0);
+  });
+});
