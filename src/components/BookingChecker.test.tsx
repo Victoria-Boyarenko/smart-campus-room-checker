@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import BookingChecker from "@/components/BookingChecker";
 import { DEFAULT_ROOM, ROOMS } from "@/data/rooms";
 import { CURRENT_TIME, type RoomConfig } from "@/lib/availability";
@@ -73,5 +73,50 @@ describe("BookingChecker — AC6 feedback messages", () => {
     render(<BookingChecker room={null} now={CURRENT_TIME} />);
     expect(screen.getByText(/No room is selected/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Check Availability" })).toBeNull();
+  });
+});
+
+describe("BookingChecker — explanation panel visibility (F3)", () => {
+  it("does not show the AI explanation during live preview before clicking Check", () => {
+    render(<BookingChecker room={DEFAULT_ROOM} now={CURRENT_TIME} />);
+    enterTimes("11:00", "12:00");
+    // Live preview shows a result hint but the explanation panel must be absent.
+    expect(screen.queryByText("AI explanation")).toBeNull();
+  });
+
+  it("shows the AI explanation only after clicking Check Availability", async () => {
+    render(<BookingChecker room={DEFAULT_ROOM} now={CURRENT_TIME} />);
+    enterTimes("11:00", "12:00");
+    fireEvent.click(screen.getByRole("button", { name: "Check Availability" }));
+    await waitFor(() => {
+      expect(screen.getByText("AI explanation")).toBeTruthy();
+    });
+  });
+
+  it("clears the explanation when the start time changes after a check", async () => {
+    render(<BookingChecker room={DEFAULT_ROOM} now={CURRENT_TIME} />);
+    enterTimes("11:00", "12:00");
+    fireEvent.click(screen.getByRole("button", { name: "Check Availability" }));
+    await waitFor(() => {
+      expect(screen.getByText("AI explanation")).toBeTruthy();
+    });
+    // Change the start time — result is cleared, so explanation disappears.
+    const startInput = screen.getByLabelText(/Start time/);
+    fireEvent.change(startInput, { target: { value: "12:00" } });
+    fireEvent.blur(startInput);
+    expect(screen.queryByText("AI explanation")).toBeNull();
+  });
+
+  it("clears the explanation when the selected room changes after a check", async () => {
+    const otherRoom = ROOMS.find((r) => r.id === "su-hall")!;
+    const { rerender } = render(<BookingChecker room={DEFAULT_ROOM} now={CURRENT_TIME} />);
+    enterTimes("11:00", "12:00");
+    fireEvent.click(screen.getByRole("button", { name: "Check Availability" }));
+    await waitFor(() => {
+      expect(screen.getByText("AI explanation")).toBeTruthy();
+    });
+    // Switch to a different room — result is cleared, so explanation disappears.
+    rerender(<BookingChecker room={otherRoom} now={CURRENT_TIME} />);
+    expect(screen.queryByText("AI explanation")).toBeNull();
   });
 });

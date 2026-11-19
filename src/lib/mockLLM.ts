@@ -93,7 +93,8 @@ export function validateInput(input: unknown): string | null {
  */
 export function validateOutput(
   output: unknown,
-  knownBookingLabels: string[]
+  knownBookingLabels: string[],
+  roomLabel = ""
 ): string | null {
   if (output === null || typeof output !== "object") return "Output is required.";
   const o = (output as Partial<ExplainOutput>).explanation;
@@ -107,7 +108,7 @@ export function validateOutput(
   if (sentences.length > MAX_SENTENCES) {
     return `explanation exceeds ${MAX_SENTENCES} sentences.`;
   }
-  if (inventsBookingLabels(trimmed, knownBookingLabels)) {
+  if (inventsBookingLabels(trimmed, knownBookingLabels, roomLabel)) {
     return "explanation references a booking not present in the room's fixtures.";
   }
   return null;
@@ -169,7 +170,7 @@ export async function explainAvailability(
   const clamped = clampExplanation(draft);
   const out: ExplainOutput = { explanation: clamped };
 
-  const outputError = validateOutput(out, input.knownBookingLabels);
+  const outputError = validateOutput(out, input.knownBookingLabels, input.roomLabel);
   if (outputError) {
     return { ok: false, fellBack: true, output: fallbackFor(input), error: outputError };
   }

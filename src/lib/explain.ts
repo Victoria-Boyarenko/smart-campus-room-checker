@@ -77,9 +77,13 @@ export function clampExplanation(raw: string): string {
 /**
  * True when the text references a booking label that is not present in the
  * selected room's fixtures. Prevents the adapter from inventing booking details.
+ *
+ * The room name is excluded from the check so that legitimate names containing
+ * words like "Study" or "Lab" (e.g. "Library Study Pod B2") are not flagged.
  */
-export function inventsBookingLabels(text: string, known: string[]): boolean {
+export function inventsBookingLabels(text: string, known: string[], roomLabel = ""): boolean {
   const lower = text.toLowerCase();
-  return known.every((label) => !lower.includes(label.toLowerCase())) &&
-    /\b(lecture|seminar|lab|study|practical|meeting|class|session)\b/i.test(text);
+  if (known.some((label) => lower.includes(label.toLowerCase()))) return false;
+  const roomless = roomLabel ? lower.replace(roomLabel.toLowerCase(), "") : lower;
+  return /\b(lecture|seminar|lab|study|practical|meeting|class|session)\b/i.test(roomless);
 }

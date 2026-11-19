@@ -7,6 +7,9 @@ import {
 } from "./mockLLM";
 import type { ExplainInput } from "./explain";
 
+import { ROOMS } from "@/data/rooms";
+import type { RoomConfig } from "@/lib/availability";
+
 const baseInput = (overrides: Partial<ExplainInput> = {}): ExplainInput => ({
   roomLabel: "Engineering Hall, Room 204",
   start: 660,
@@ -102,6 +105,61 @@ describe("explainAvailability", () => {
     );
     expect(res.ok).toBe(true);
     expect(res.output.explanation).not.toContain("Data Structures Lecture");
+  });
+
+  it("generates a non-fallback explanation for all five rooms (F1 regression)", async () => {
+    // Find a free slot for each room (start after all bookings + current time).
+    function freeSlot(room: RoomConfig): { start: number; end: number } {
+      const afterBookings = room.bookings.length
+        ? Math.max(...room.bookings.map((b) => b.end))
+        : 540;
+      const start = Math.max(afterBookings, 540) + 60;
+      return { start, end: start + 60 };
+    }
+    for (const room of ROOMS) {
+      if (room.blocked) continue;
+      const { start, end } = freeSlot(room);
+      const res = await explainAvailability({
+        roomLabel: room.name,
+        start,
+        end,
+        isAvailable: true,
+        reasonCode: "available",
+        knownBookingLabels: room.bookings.map((b) => b.label),
+      });
+      expect(res.ok).toBe(true);
+      expect(res.fellBack).toBe(false);
+      expect(res.output.explanation).toContain(room.name);
+      expect(res.output.explanation.length).toBeLessThanOrEqual(200);
+    }
+  });
+
+  it("does not flag 'Library Study Pod B2' as inventing bookings (F1 regression)", async () => {
+    const res = await explainAvailability({
+      roomLabel: "Library Study Pod B2",
+      start: 660,
+      end: 720,
+      isAvailable: true,
+      reasonCode: "available",
+      knownBookingLabels: ["Group Study: Thesis Review"],
+    });
+    expect(res.ok).toBe(true);
+    expect(res.fellBack).toBe(false);
+    expect(res.output.explanation).toContain("Library Study Pod B2");
+  });
+
+  it("does not flag 'Science Centre, Lab 3' as inventing bookings (F1 regression)", async () => {
+    const res = await explainAvailability({
+      roomLabel: "Science Centre, Lab 3",
+      start: 660,
+      end: 720,
+      isAvailable: true,
+      reasonCode: "available",
+      knownBookingLabels: ["Chemistry Practical"],
+    });
+    expect(res.ok).toBe(true);
+    expect(res.fellBack).toBe(false);
+    expect(res.output.explanation).toContain("Science Centre, Lab 3");
   });
 
   it("explains a blocked room", async () => {

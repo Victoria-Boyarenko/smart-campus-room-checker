@@ -38,6 +38,36 @@ describe("inventsBookingLabels", () => {
   it("does not flag neutral text", () => {
     expect(inventsBookingLabels("The room is free now.", [])).toBe(false);
   });
+
+  it("does not flag room names containing 'study' when roomLabel is passed", () => {
+    expect(
+      inventsBookingLabels(
+        "Library Study Pod B2 has no conflicting bookings.",
+        ["Group Study: Thesis Review"],
+        "Library Study Pod B2"
+      )
+    ).toBe(false);
+  });
+
+  it("does not flag room names containing 'lab' when roomLabel is passed", () => {
+    expect(
+      inventsBookingLabels(
+        "The requested slot in Science Centre, Lab 3 overlaps an existing booking.",
+        ["Chemistry Practical"],
+        "Science Centre, Lab 3"
+      )
+    ).toBe(false);
+  });
+
+  it("still flags invented booking nouns not in the room name", () => {
+    expect(
+      inventsBookingLabels(
+        "Engineering Hall, Room 204 has a lecture at noon.",
+        [],
+        "Engineering Hall, Room 204"
+      )
+    ).toBe(true);
+  });
 });
 
 describe("reasonCodeFromMessage", () => {
