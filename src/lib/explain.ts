@@ -38,26 +38,6 @@ export type ExplainResult =
   | { ok: false; fellBack: true; output: ExplainOutput; error: string };
 
 /**
- * Map the deterministic AvailabilityResult to a reason code so the adapter
- * never re-derives availability. Determined from the confirmed message only.
- */
-export function reasonCodeFromMessage(
-  message: string,
-  isAvailable: boolean
-): ReasonCode {
-  if (isAvailable) return "available";
-  const m = message.toLowerCase();
-  if (m.startsWith("overlaps")) return "overlap";
-  if (m.includes("blocked")) return "room_blocked";
-  if (m.includes("maximum")) return "exceeds_max_duration";
-  if (m.includes("current time")) return "start_after_now";
-  if (m.includes("whole minutes") || m.includes("between 00:00") || m.includes("later than the start")) {
-    return "invalid_time";
-  }
-  return "invalid_time";
-}
-
-/**
  * Sentence-aware trim: collapses the text to at most MAX_SENTENCES sentences and
  * MAX_EXPLANATION_LENGTH characters, then trims trailing whitespace.
  */

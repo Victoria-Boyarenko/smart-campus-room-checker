@@ -177,3 +177,33 @@ describe("checkAvailability — AC6 user-facing result shape", () => {
     expect(unavailable.message.length).toBeGreaterThan(0);
   });
 });
+
+describe("checkAvailability — reasonCode is set directly on every result branch", () => {
+  it("sets reasonCode 'available' for an available slot", () => {
+    expect(checkAvailability(700, 760, emptyRoom).reasonCode).toBe("available");
+  });
+
+  it("sets reasonCode 'overlap' for an overlapping slot", () => {
+    expect(checkAvailability(630, 690, DEFAULT_ROOM).reasonCode).toBe("overlap");
+  });
+
+  it("sets reasonCode 'room_blocked' for a blocked room", () => {
+    expect(checkAvailability(780, 840, blockedRoom).reasonCode).toBe("room_blocked");
+  });
+
+  it("sets reasonCode 'exceeds_max_duration' for an over-long booking", () => {
+    expect(checkAvailability(600, 721, emptyRoom).reasonCode).toBe("exceeds_max_duration");
+  });
+
+  it("sets reasonCode 'start_after_now' for a past start time", () => {
+    expect(checkAvailability(500, 600, emptyRoom).reasonCode).toBe("start_after_now");
+  });
+
+  it("sets reasonCode 'invalid_time' for non-integer minutes", () => {
+    expect(checkAvailability(600.5, 660, emptyRoom).reasonCode).toBe("invalid_time");
+  });
+
+  it("sets reasonCode 'invalid_time' for end not later than start", () => {
+    expect(checkAvailability(660, 600, emptyRoom).reasonCode).toBe("invalid_time");
+  });
+});

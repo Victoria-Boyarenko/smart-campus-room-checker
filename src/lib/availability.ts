@@ -3,6 +3,7 @@
 import { findConflict, type Booking } from "./canBook";
 import { durationLabel, minutesToLabel } from "./time";
 import { isStartAfterNow } from "./startTime";
+import type { ReasonCode } from "./explain";
 
 export interface RoomConfig {
   id: string;
@@ -20,6 +21,8 @@ export interface AvailabilityResult {
   kind: ResultKind;
   message: string;
   isAvailable: boolean;
+  /** Deterministic reason code for the explanation adapter. */
+  reasonCode: ReasonCode;
 }
 
 export const CURRENT_TIME = 540; // 09:00 — fixed "now" for reproducible testing
@@ -38,35 +41,37 @@ export function checkAvailability(
 ): AvailabilityResult {
   // AC1: integer minutes, 0 <= start < end <= 1440, start > now
   if (!Number.isInteger(start) || !Number.isInteger(end)) {
-    return unavailable("Start and end times must be whole minutes.");
+    return unavailable("Start and end times must be whole minutes.", "invalid_time");
   }
   if (start < 0 || end > 1440) {
-    return unavailable("Times must be between 00:00 and 24:00 (0–1440 minutes).");
+    return unavailable("Times must be between 00:00 and 24:00 (0–1440 minutes).", "invalid_time");
   }
   if (start >= end) {
-    return unavailable("The end time must be later than the start time.");
+    return unavailable("The end time must be later than the start time.", "invalid_time");
   }
   if (!isStartAfterNow(start, now)) {
-    return unavailable(`The start time must be later than the current time (${minutesToLabel(now)}).`);
+    return unavailable(`The start time must be later than the current time (${minutesToLabel(now)}).`, "start_after_now");
   }
 
   // AC2: max duration 120, exactly 120 allowed
   if (exceedsMaxDuration(start, end)) {
     return unavailable(
-      `Booking duration is ${end - start} minutes. The maximum is ${MAX_DURATION} minutes.`
+      `Booking duration is ${end - start} minutes. The maximum is ${MAX_DURATION} minutes.`,
+      "exceeds_max_duration"
     );
   }
 
   // AC3: blocked room is always unavailable
   if (room.blocked) {
-    return unavailable("This room is currently blocked and cannot be booked.");
+    return unavailable("This room is currently blocked and cannot be booked.", "room_blocked");
   }
 
   // AC4: reject overlaps; touching at endpoints is allowed
   const conflict = findConflict(room.bookings, start, end);
   if (conflict) {
     return unavailable(
-      `Overlaps with an existing booking: ${conflict.label} (${minutesToLabel(conflict.start)}–${minutesToLabel(conflict.end)}).`
+      `Overlaps with an existing booking: ${conflict.label} (${minutesToLabel(conflict.start)}–${minutesToLabel(conflict.end)}).`,
+      "overlap"
     );
   }
 
@@ -77,9 +82,9 @@ export function checkAvailability(
 }
 
 function available(message: string): AvailabilityResult {
-  return { kind: "available", message, isAvailable: true };
+  return { kind: "available", message, isAvailable: true, reasonCode: "available" };
 }
 
-function unavailable(message: string): AvailabilityResult {
-  return { kind: "unavailable", message, isAvailable: false };
+function unavailable(message: string, reasonCode: ReasonCode): AvailabilityResult {
+  return { kind: "unavailable", message, isAvailable: false, reasonCode };
 }

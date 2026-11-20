@@ -119,4 +119,11 @@ describe("BookingChecker — explanation panel visibility (F3)", () => {
     rerender(<BookingChecker room={otherRoom} now={CURRENT_TIME} />);
     expect(screen.queryByText("AI explanation")).toBeNull();
   });
+
+  it("does not show the AI explanation when times are missing and Check is pressed (R2)", () => {
+    render(<BookingChecker room={DEFAULT_ROOM} now={CURRENT_TIME} />);
+    fireEvent.click(screen.getByRole("button", { name: "Check Availability" }));
+    expect(screen.getByText("Please select both a start and an end time.")).toBeTruthy();
+    expect(screen.queryByText("AI explanation")).toBeNull();
+  });
 });

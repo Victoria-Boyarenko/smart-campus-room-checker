@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   clampExplanation,
   inventsBookingLabels,
-  reasonCodeFromMessage,
   MAX_EXPLANATION_LENGTH,
 } from "./explain";
 
@@ -70,28 +69,4 @@ describe("inventsBookingLabels", () => {
   });
 });
 
-describe("reasonCodeFromMessage", () => {
-  it("returns available for available results", () => {
-    expect(reasonCodeFromMessage("Available!", true)).toBe("available");
-  });
 
-  it("maps overlap messages", () => {
-    expect(reasonCodeFromMessage("Overlaps with an existing booking: Lab.", false)).toBe("overlap");
-  });
-
-  it("maps blocked messages", () => {
-    expect(reasonCodeFromMessage("This room is currently blocked and cannot be booked.", false)).toBe("room_blocked");
-  });
-
-  it("maps duration messages", () => {
-    expect(reasonCodeFromMessage("Booking duration is 150 minutes. The maximum is 120 minutes.", false)).toBe("exceeds_max_duration");
-  });
-
-  it("maps past-time messages", () => {
-    expect(reasonCodeFromMessage("The start time must be later than the current time (09:00).", false)).toBe("start_after_now");
-  });
-
-  it("maps invalid-time messages", () => {
-    expect(reasonCodeFromMessage("Times must be between 00:00 and 24:00 (0–1440 minutes).", false)).toBe("invalid_time");
-  });
-});

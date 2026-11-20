@@ -12,7 +12,7 @@ import TimeSelect from "@/components/TimeSelect";
 import Timeline from "@/components/Timeline";
 import ResultBanner from "@/components/ResultBanner";
 import ExplainPanel from "@/components/ExplainPanel";
-import { reasonCodeFromMessage, type ExplainInput, type ReasonCode } from "@/lib/explain";
+import type { ExplainInput } from "@/lib/explain";
 
 interface BookingCheckerProps {
   room: RoomConfig | null;
@@ -55,6 +55,7 @@ export default function BookingChecker({ room, now }: BookingCheckerProps) {
         kind: "error",
         message: "Please select both a start and an end time.",
         isAvailable: false,
+        reasonCode: "missing_times",
       });
       return;
     }
@@ -140,7 +141,7 @@ export default function BookingChecker({ room, now }: BookingCheckerProps) {
                   start: s,
                   end: e,
                   isAvailable: result.isAvailable,
-                  reasonCode: reasonCodeFromMessage(result.message, result.isAvailable) as ReasonCode,
+                  reasonCode: result.reasonCode,
                   knownBookingLabels: room.bookings.map((b) => b.label),
                 } satisfies ExplainInput}
               />
